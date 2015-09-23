@@ -11,7 +11,7 @@ function title {
 }
 
 kernel_version=${1}
-WORKSPACE=${WORKSPACE:-/tmp}
+WORKSPACE=${WORKSPACE:-$HOME}
 SCRIPTDIR=$(readlink -f $0)
 SCRIPTDIR=${SCRIPTDIR%/*}
 
@@ -30,7 +30,7 @@ title "Getting linux kernel package"
 ddeb_name="linux-image-${kernel_version}-generic-dbgsym"
 ddeb_file=$(find . -name "${ddeb_name}*ddeb" -type f | head -n1)
 if [ -z "${ddeb_file}" ]; then
-    echo 'ddeb package for kernel ${kernel_version} not found, trying to download ...'
+    echo "ddeb package for kernel ${kernel_version} not found, trying to download ..."
     aptitude download ${ddeb_name}
     ddeb_file=$(find . -name "${ddeb_name}*ddeb" -type f | head -n1)
     if [ -z "${ddeb_file}" ]; then
@@ -41,31 +41,41 @@ fi
 
 
 title "Extracting package"
-mkdir ${ddeb_name}
-dpkg -x ${ddeb_file} ${ddeb_name}
+kernel="vmlinux-${kernel_version}-generic"
+if [ ! -d ${ddeb_name} ]; then
+    mkdir ${ddeb_name}
+fi
 
+if [ ! -f ${kernel} ]; then
+    if [ ! -f ${ddeb_name}/usr/lib/debug/boot/${kernel} ]; then
+        dpkg -x ${ddeb_file} ${ddeb_name}
+    fi
 
-title "Cleaning up"
-cd ${ddeb_name}
-mv usr/lib/debug/boot/vmlinux* .
-rm -rf usr
-kernel_file=$(ls -1 | head -n1)
+    cd ${ddeb_name}
+    if [ ! -f usr/lib/debug/boot/${kernel} ]; then
+        echo "Something went wrong, can't find ${kernel} file"
+        exit 1
+    fi
+
+    mv usr/lib/debug/boot/${kernel} .
+    rm -rf usr
+fi
 
 
 title "Generating ABI dump"
-abi-dumper ${kernel_file} -o ${kernel_file}.dump
+abi-dumper ${kernel} -o ${kernel}.dump
 
 
 title "Converting dump to JSON format"
-perl ${SCRIPTDIR}/hash2json.pl ${kernel_file}.dump
+perl ${SCRIPTDIR}/dump2json.pl ${kernel}.dump
 
 
 title "Generating TypeInfo list"
-python ${SCRIPTDIR}/abi-parser.py typeinfo ${kernel_file}.dump.json | sort > ${kernel_file}.TypeInfo
+python ${SCRIPTDIR}/abi-parser.py typeinfo ${kernel}.dump.json | sort > ${kernel}.TypeInfo
 
 
 title "Generating SymbolInfo list"
-python ${SCRIPTDIR}/abi-parser.py symbolinfo ${kernel_file}.dump.json | sort > ${kernel_file}.SymbolInfo
+python ${SCRIPTDIR}/abi-parser.py symbolinfo ${kernel}.dump.json | sort > ${kernel}.SymbolInfo
 
 
 popd
