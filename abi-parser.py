@@ -85,19 +85,26 @@ class TypeInfo(object):
             return type_id
 
 
-ifile = sys.argv[1]
+mode = sys.argv[1]
+ifile = sys.argv[2]
 
-dump = {}
+abi_dump = {}
 with open(ifile) as f:
-    dump = json.load(f)
-
-for key in dump.get('TypeInfo'):
-    t = TypeInfo(key, dump['TypeInfo'][key])
-
-for key in dump.get('SymbolInfo'):
-    t = SymbolInfo(key, dump['SymbolInfo'][key])
+    abi_dump = json.load(f)
 
 
-for item in SymbolInfo.catalog.values():
+for key in abi_dump.get('TypeInfo'):
+    TypeInfo(key, abi_dump['TypeInfo'][key])
+
+for key in abi_dump.get('SymbolInfo'):
+    SymbolInfo(key, abi_dump['SymbolInfo'][key])
+
+
+if mode == 'typeinfo':
+    for item in TypeInfo.catalog.values():
+        print str(item)
+
+if mode == 'symbolinfo':
+    for item in SymbolInfo.catalog.values():
         print str(item)
 
